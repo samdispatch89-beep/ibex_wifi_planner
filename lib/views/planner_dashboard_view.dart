@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../controllers/planner_controller.dart';
+import '../controllers/rf_planner_controller.dart';
 import '../models/planner_models.dart';
+import '../screens/planner/rf_planner_screen.dart';
 import 'animated_ui.dart';
 import 'responsive_breakpoints.dart';
 
@@ -20,10 +22,14 @@ class PlannerDashboardView extends StatelessWidget {
         final selectedIndex = controller.selectedIndex;
         final selectedPage = controller.selectedPage;
         final isMobile = ResponsiveBreakpoints.isMobile(context);
-        final isTablet = ResponsiveBreakpoints.isTablet(context);
         final isDesktop = ResponsiveBreakpoints.isDesktop(context);
         final contentPadding = ResponsiveBreakpoints.contentPadding(context);
         final sectionSpacing = ResponsiveBreakpoints.sectionSpacing(context);
+        final pageBody = _buildPageContent(
+          context: context,
+          label: selectedPage.label,
+          snapshot: snapshot,
+        );
 
         return Scaffold(
           drawer: isDesktop
@@ -37,182 +43,64 @@ class PlannerDashboardView extends StatelessWidget {
                     controller.selectPage(index);
                   },
                 ),
-          bottomNavigationBar: isDesktop
-              ? null
-              : isTablet
-              ? NavigationBar(
-                  selectedIndex: selectedIndex,
-                  onDestinationSelected: controller.selectPage,
-                  destinations: [
-                    for (final page in pages)
-                      NavigationDestination(
-                        icon: Icon(page.icon),
-                        selectedIcon: Icon(page.selectedIcon),
-                        label: page.label,
-                      ),
-                  ],
-                )
-              : null,
           body: SafeArea(
-            child: Builder(
-              builder: (context) {
-                final pageBody = _buildPageContent(
-                  label: selectedPage.label,
-                  snapshot: snapshot,
-                );
-
-                if (!isDesktop) {
-                  return Padding(
-                    padding: EdgeInsets.all(contentPadding),
-                    child: Column(
-                      children: [
-                        Container(
-                          width: double.infinity,
-                          padding: EdgeInsets.all(contentPadding + 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF10352A),
-                            borderRadius: BorderRadius.circular(28),
-                          ),
-                          child: Column(
-                            children: [
-                              _CompactHeader(
-                                title: selectedPage.label,
-                                isMobile: isMobile,
-                                onMenuPressed: () {
-                                  Scaffold.of(context).openDrawer();
-                                },
-                              ),
-                              SizedBox(height: sectionSpacing),
-                              _StatusBanner(snapshot: snapshot),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: sectionSpacing),
-                        Expanded(
-                          child: Column(
-                            children: [
-                              _TopBar(
-                                title: selectedPage.label,
-                                snapshot: snapshot,
-                                compact: true,
-                              ),
-                              SizedBox(height: sectionSpacing),
-                              Expanded(
-                                child: AnimatedPageSwitcher(
-                                  transitionKey: selectedPage.label,
-                                  child: pageBody,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+            child: Row(
+              children: [
+                if (isDesktop)
+                  _CollapsibleSidebar(
+                    snapshot: snapshot,
+                    pages: pages,
+                    selectedIndex: selectedIndex,
+                    isCollapsed: controller.isSidebarCollapsed,
+                    isDeploymentProfileExpanded:
+                        controller.isDeploymentProfileExpanded,
+                    onToggleSidebar: controller.toggleSidebar,
+                    onToggleDeploymentProfile:
+                        controller.toggleDeploymentProfile,
+                    onSelected: controller.selectPage,
+                  ),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      contentPadding,
+                      contentPadding,
+                      contentPadding,
+                      24,
                     ),
-                  );
-                }
-
-                return Row(
-                  children: [
-                    Container(
-                      width: 280,
-                      padding: const EdgeInsets.all(20),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF10352A),
-                        borderRadius: BorderRadius.only(
-                          topRight: Radius.circular(32),
-                          bottomRight: Radius.circular(32),
-                        ),
-                      ),
-                      child: LayoutBuilder(
-                        builder: (context, sidebarConstraints) {
-                          return SingleChildScrollView(
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(
-                                minHeight: sidebarConstraints.maxHeight,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const _BrandHeader(),
-                                  SizedBox(height: sectionSpacing + 6),
-                                  _StatusBanner(snapshot: snapshot),
-                                  SizedBox(height: sectionSpacing + 6),
-                                  SizedBox(
-                                    height: pages.length * 72,
-                                    child: NavigationRail(
-                                      selectedIndex: selectedIndex,
-                                      groupAlignment: -1,
-                                      onDestinationSelected:
-                                          controller.selectPage,
-                                      backgroundColor: Colors.transparent,
-                                      indicatorColor: const Color(0xFFB7F0C1),
-                                      selectedIconTheme: const IconThemeData(
-                                        color: Color(0xFF10352A),
-                                      ),
-                                      unselectedIconTheme: const IconThemeData(
-                                        color: Colors.white70,
-                                      ),
-                                      selectedLabelTextStyle: const TextStyle(
-                                        color: Color(0xFFF3FFF6),
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                      unselectedLabelTextStyle: const TextStyle(
-                                        color: Colors.white70,
-                                      ),
-                                      destinations: [
-                                        for (final page in pages)
-                                          NavigationRailDestination(
-                                            icon: Icon(page.icon),
-                                            selectedIcon: Icon(
-                                              page.selectedIcon,
-                                            ),
-                                            label: Text(page.label),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                  SizedBox(height: sectionSpacing + 4),
-                                  _SidebarFooter(
-                                    isExpanded:
-                                        controller.isDeploymentProfileExpanded,
-                                    onToggle:
-                                        controller.toggleDeploymentProfile,
-                                  ),
-                                ],
-                              ),
+                    child: _AppScrollContainer(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _HeroHeader(
+                            snapshot: snapshot,
+                            selectedPage: selectedPage,
+                            isMobile: isMobile,
+                            isDesktop: isDesktop,
+                            isSidebarCollapsed: controller.isSidebarCollapsed,
+                            onMenuPressed: isDesktop
+                                ? controller.toggleSidebar
+                                : () => Scaffold.of(context).openDrawer(),
+                          ),
+                          SizedBox(height: sectionSpacing + 2),
+                          _TopFeatureBar(
+                            pages: pages,
+                            selectedIndex: selectedIndex,
+                            onSelected: controller.selectPage,
+                          ),
+                          SizedBox(height: sectionSpacing + 4),
+                          AnimatedPageSwitcher(
+                            transitionKey: selectedPage.label,
+                            child: KeyedSubtree(
+                              key: ValueKey(selectedPage.label),
+                              child: pageBody,
                             ),
-                          );
-                        },
+                          ),
+                        ],
                       ),
                     ),
-                    Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          contentPadding,
-                          contentPadding,
-                          contentPadding,
-                          18,
-                        ),
-                        child: Column(
-                          children: [
-                            _TopBar(
-                              title: selectedPage.label,
-                              snapshot: snapshot,
-                            ),
-                            SizedBox(height: sectionSpacing + 2),
-                            Expanded(
-                              child: AnimatedPageSwitcher(
-                                transitionKey: selectedPage.label,
-                                child: pageBody,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
+                  ),
+                ),
+              ],
             ),
           ),
         );
@@ -221,12 +109,16 @@ class PlannerDashboardView extends StatelessWidget {
   }
 
   Widget _buildPageContent({
+    required BuildContext context,
     required String label,
     required PlannerSnapshot snapshot,
   }) {
     switch (label) {
       case 'RF Planner':
-        return RfPlannerView(snapshot: snapshot);
+        return ChangeNotifierProvider<RfPlannerController>.value(
+          value: context.read<PlannerController>().rfPlannerController,
+          child: const RfPlannerScreen(),
+        );
       case 'Optimizer':
         return OptimizerView(snapshot: snapshot);
       case 'Insights':
@@ -239,6 +131,307 @@ class PlannerDashboardView extends StatelessWidget {
       default:
         return OverviewView(snapshot: snapshot);
     }
+  }
+}
+
+class _AppScrollContainer extends StatelessWidget {
+  const _AppScrollContainer({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CollapsibleSidebar extends StatelessWidget {
+  const _CollapsibleSidebar({
+    required this.snapshot,
+    required this.pages,
+    required this.selectedIndex,
+    required this.isCollapsed,
+    required this.isDeploymentProfileExpanded,
+    required this.onToggleSidebar,
+    required this.onToggleDeploymentProfile,
+    required this.onSelected,
+  });
+
+  final PlannerSnapshot snapshot;
+  final List<DashboardPageDefinition> pages;
+  final int selectedIndex;
+  final bool isCollapsed;
+  final bool isDeploymentProfileExpanded;
+  final VoidCallback onToggleSidebar;
+  final VoidCallback onToggleDeploymentProfile;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final spacing = ResponsiveBreakpoints.sectionSpacing(context);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+      width: isCollapsed ? 104 : 292,
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.all(18),
+      decoration: const BoxDecoration(
+        color: Color(0xFF10352A),
+        borderRadius: BorderRadius.only(
+          topRight: Radius.circular(36),
+          bottomRight: Radius.circular(36),
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(child: _BrandHeader(compact: isCollapsed)),
+              const SizedBox(width: 8),
+              Tooltip(
+                message: isCollapsed ? 'Expand sidebar' : 'Collapse sidebar',
+                child: PressScale(
+                  onTap: onToggleSidebar,
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      isCollapsed
+                          ? Icons.keyboard_double_arrow_right
+                          : Icons.keyboard_double_arrow_left,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: spacing + 4),
+          if (!isCollapsed) ...[
+            _StatusBanner(snapshot: snapshot),
+            SizedBox(height: spacing + 4),
+          ],
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                children: [
+                  for (var index = 0; index < pages.length; index++) ...[
+                    _SidebarNavTile(
+                      page: pages[index],
+                      selected: index == selectedIndex,
+                      collapsed: isCollapsed,
+                      onTap: () => onSelected(index),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          if (!isCollapsed) ...[
+            SizedBox(height: spacing),
+            _SidebarFooter(
+              isExpanded: isDeploymentProfileExpanded,
+              onToggle: onToggleDeploymentProfile,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroHeader extends StatelessWidget {
+  const _HeroHeader({
+    required this.snapshot,
+    required this.selectedPage,
+    required this.isMobile,
+    required this.isDesktop,
+    required this.isSidebarCollapsed,
+    required this.onMenuPressed,
+  });
+
+  final PlannerSnapshot snapshot;
+  final DashboardPageDefinition selectedPage;
+  final bool isMobile;
+  final bool isDesktop;
+  final bool isSidebarCollapsed;
+  final VoidCallback onMenuPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final spacing = ResponsiveBreakpoints.sectionSpacing(context);
+
+    return FadeSlideIn(
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(
+          ResponsiveBreakpoints.panelPadding(context) + 4,
+        ),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5EFE4),
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(color: const Color(0xFFE6DDCD)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 14,
+              runSpacing: 14,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                PressScale(
+                  onTap: onMenuPressed,
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE3DACE)),
+                    ),
+                    child: Icon(
+                      isDesktop && !isSidebarCollapsed
+                          ? Icons.menu_open_rounded
+                          : Icons.menu_rounded,
+                      color: const Color(0xFF10352A),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: isMobile ? double.infinity : null,
+                  child: _BrandHeader(lightTheme: true, compact: false),
+                ),
+                if (!isMobile)
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      _HeaderActionChip(
+                        label: 'Sites ${snapshot.activeSites}',
+                        icon: Icons.apartment_rounded,
+                      ),
+                      _HeaderActionChip(
+                        label: 'Vendors ${snapshot.connectedVendors}',
+                        icon: Icons.hub_rounded,
+                      ),
+                      _HeaderActionChip(
+                        label: 'Live ${snapshot.liveClients}',
+                        icon: Icons.wifi_tethering_rounded,
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+            SizedBox(height: spacing + 6),
+            Text(
+              selectedPage.label,
+              style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF2C2B2A),
+                height: 1.05,
+              ),
+            ),
+            const SizedBox(height: 10),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: Text(
+                'Plan, simulate, optimize, and analyze WiFi deployments from a single responsive control plane that now scrolls as one unified page.',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: const Color(0xFF5E5A55),
+                  height: 1.45,
+                ),
+              ),
+            ),
+            SizedBox(height: spacing + 2),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: const [
+                _HeroCtaButton(
+                  label: 'Simulation-ready',
+                  filled: true,
+                  icon: Icons.play_circle_outline_rounded,
+                ),
+                _HeroCtaButton(
+                  label: 'Responsive shell',
+                  icon: Icons.web_asset_rounded,
+                ),
+                _HeroCtaButton(
+                  label: 'Provider state',
+                  icon: Icons.account_tree_outlined,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TopFeatureBar extends StatelessWidget {
+  const _TopFeatureBar({
+    required this.pages,
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  final List<DashboardPageDefinition> pages;
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final isMobile = ResponsiveBreakpoints.isMobile(context);
+    final buttons = [
+      for (var index = 0; index < pages.length; index++)
+        _FeatureShortcutButton(
+          page: pages[index],
+          selected: index == selectedIndex,
+          onTap: () => onSelected(index),
+        ),
+    ];
+
+    return FadeSlideIn(
+      delay: const Duration(milliseconds: 40),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Workspace shortcuts',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 10),
+          if (isMobile)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: buttons),
+            )
+          else
+            Wrap(spacing: 10, runSpacing: 10, children: buttons),
+        ],
+      ),
+    );
   }
 }
 
@@ -322,74 +515,6 @@ class _NavigationDrawer extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _CompactHeader extends StatelessWidget {
-  const _CompactHeader({
-    required this.title,
-    required this.isMobile,
-    required this.onMenuPressed,
-  });
-
-  final String title;
-  final bool isMobile;
-  final VoidCallback onMenuPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final headerButton = PressScale(
-      onTap: onMenuPressed,
-      child: const Padding(
-        padding: EdgeInsets.all(8),
-        child: Icon(Icons.menu, color: Colors.white),
-      ),
-    );
-
-    if (isMobile) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              headerButton,
-              const SizedBox(width: 8),
-              const Expanded(child: _BrandHeader()),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      );
-    }
-
-    return Row(
-      children: [
-        headerButton,
-        const SizedBox(width: 8),
-        const Expanded(child: _BrandHeader()),
-        const SizedBox(width: 8),
-        Flexible(
-          child: Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -479,11 +604,18 @@ class _SidebarFooter extends StatelessWidget {
 }
 
 class _BrandHeader extends StatelessWidget {
-  const _BrandHeader();
+  const _BrandHeader({this.compact = false, this.lightTheme = false});
+
+  final bool compact;
+  final bool lightTheme;
 
   @override
   Widget build(BuildContext context) {
+    final titleColor = lightTheme ? const Color(0xFF2C2B2A) : Colors.white;
+    final subtitleColor = lightTheme ? const Color(0xFF6A665F) : Colors.white70;
+
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           width: 52,
@@ -494,29 +626,246 @@ class _BrandHeader extends StatelessWidget {
           ),
           child: const Icon(Icons.router, color: Color(0xFF10352A), size: 28),
         ),
-        const SizedBox(width: 14),
-        const Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Ibex Planner',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
+        if (!compact) ...[
+          const SizedBox(width: 14),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Ibex Planner',
+                  style: TextStyle(
+                    color: titleColor,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
+                Text(
+                  'WiFi planning control plane',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: subtitleColor),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SidebarNavTile extends StatelessWidget {
+  const _SidebarNavTile({
+    required this.page,
+    required this.selected,
+    required this.collapsed,
+    required this.onTap,
+  });
+
+  final DashboardPageDefinition page;
+  final bool selected;
+  final bool collapsed;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      padding: EdgeInsets.symmetric(
+        horizontal: collapsed ? 10 : 14,
+        vertical: 12,
+      ),
+      decoration: BoxDecoration(
+        color: selected ? const Color(0xFFB7F0C1) : Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: selected
+              ? Colors.transparent
+              : Colors.white.withValues(alpha: 0.08),
+        ),
+      ),
+      child: collapsed
+          ? Center(
+              child: Icon(
+                selected ? page.selectedIcon : page.icon,
+                color: selected ? const Color(0xFF10352A) : Colors.white70,
               ),
+            )
+          : Row(
+              children: [
+                Icon(
+                  selected ? page.selectedIcon : page.icon,
+                  color: selected ? const Color(0xFF10352A) : Colors.white70,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    page.label,
+                    style: TextStyle(
+                      color: selected ? const Color(0xFF10352A) : Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_outward_rounded,
+                  size: 16,
+                  color: selected
+                      ? const Color(0xFF10352A)
+                      : Colors.white.withValues(alpha: 0.44),
+                ),
+              ],
+            ),
+    );
+
+    if (collapsed) {
+      return Tooltip(
+        message: page.label,
+        child: PressScale(onTap: onTap, child: child),
+      );
+    }
+
+    return PressScale(onTap: onTap, child: child);
+  }
+}
+
+class _HeaderActionChip extends StatelessWidget {
+  const _HeaderActionChip({required this.label, required this.icon});
+
+  final String label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFE3DACE)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: const Color(0xFF10352A)),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF2C2B2A),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroCtaButton extends StatelessWidget {
+  const _HeroCtaButton({
+    required this.label,
+    required this.icon,
+    this.filled = false,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    final isMobile = ResponsiveBreakpoints.isMobile(context);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: filled ? const Color(0xFF2563EB) : Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+        color: filled ? const Color(0xFF2563EB) : const Color(0xFFD8D1C7),
+        ),
+      ),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Icon(
+            icon,
+            size: 18,
+            color: filled ? Colors.white : const Color(0xFF10352A),
+          ),
+          Text(
+            label,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: filled ? Colors.white : const Color(0xFF2C2B2A),
+              fontWeight: FontWeight.w700,
+              fontSize: isMobile ? 13 : 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeatureShortcutButton extends StatelessWidget {
+  const _FeatureShortcutButton({
+    required this.page,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final DashboardPageDefinition page;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: PressScale(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFF10352A) : Colors.white,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected
+                  ? const Color(0xFF10352A)
+                  : const Color(0xFFD8E0D4),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                selected ? page.selectedIcon : page.icon,
+                size: 18,
+                color: selected ? Colors.white : const Color(0xFF10352A),
+              ),
+              const SizedBox(width: 8),
               Text(
-                'WiFi planning control plane',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.white70),
+                page.label,
+                style: TextStyle(
+                  color: selected ? Colors.white : const Color(0xFF10352A),
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -627,139 +976,6 @@ class _SidebarMetric extends StatelessWidget {
   }
 }
 
-class _TopBar extends StatelessWidget {
-  const _TopBar({
-    required this.title,
-    required this.snapshot,
-    this.compact = false,
-  });
-
-  final String title;
-  final PlannerSnapshot snapshot;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final spacing = ResponsiveBreakpoints.sectionSpacing(context);
-    final stats = Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children: [
-        _TopStatChip(label: 'Sites', value: '${snapshot.activeSites}'),
-        _TopStatChip(label: 'Vendors', value: '${snapshot.connectedVendors}'),
-        _TopStatChip(label: 'Live clients', value: '${snapshot.liveClients}'),
-      ],
-    );
-
-    if (compact) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Architecture, simulation, optimization, telemetry, and reporting in one operator workspace.',
-            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.black54),
-          ),
-          SizedBox(height: spacing),
-          SingleChildScrollView(scrollDirection: Axis.horizontal, child: stats),
-        ],
-      );
-    }
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Architecture, simulation, optimization, telemetry, and reporting in one operator workspace.',
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: Colors.black54,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 16),
-        Flexible(child: stats),
-      ],
-    );
-  }
-}
-
-class _TopStatChip extends StatelessWidget {
-  const _TopStatChip({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = ResponsiveBreakpoints.isMobile(context);
-
-    return HoverLift(
-      borderRadius: 18,
-      enableHover: !isMobile,
-      hoverOffset: -2,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        padding: EdgeInsets.symmetric(
-          horizontal: isMobile ? 12 : 16,
-          vertical: isMobile ? 10 : 12,
-        ),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFE0E7DA)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: const TextStyle(color: Colors.black54)),
-            const SizedBox(height: 2),
-            TweenAnimationBuilder<double>(
-              tween: Tween<double>(begin: 0.98, end: 1),
-              duration: const Duration(milliseconds: 280),
-              curve: Curves.easeOutCubic,
-              builder: (context, value, child) {
-                return Transform.scale(
-                  scale: value,
-                  alignment: Alignment.centerLeft,
-                  child: child,
-                );
-              },
-              child: Text(
-                value,
-                style: TextStyle(
-                  fontSize: isMobile ? 16 : 18,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _ResponsiveSplit extends StatelessWidget {
   const _ResponsiveSplit({
     required this.left,
@@ -832,6 +1048,154 @@ class _ResponsiveMetricGrid extends StatelessWidget {
   }
 }
 
+class _PromptSequenceCard extends StatelessWidget {
+  const _PromptSequenceCard({required this.item});
+
+  final RfPromptSequence item;
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeSlideIn(
+      child: HoverLift(
+        borderRadius: 20,
+        enableHover: !ResponsiveBreakpoints.isMobile(context),
+        hoverOffset: -2,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE1E9E0)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFB7F0C1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(
+                  child: Text(
+                    '${item.step}',
+                    style: const TextStyle(
+                      color: Color(0xFF10352A),
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      item.goal,
+                      style: const TextStyle(color: Colors.black54),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RfEngineModuleCard extends StatelessWidget {
+  const _RfEngineModuleCard({required this.module});
+
+  final RfEngineModule module;
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeSlideIn(
+      child: HoverLift(
+        borderRadius: 20,
+        enableHover: !ResponsiveBreakpoints.isMobile(context),
+        hoverOffset: -2,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFDDE7DD)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                module.title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                module.summary,
+                style: const TextStyle(color: Colors.black54),
+              ),
+              const SizedBox(height: 12),
+              _BulletedBlock(items: module.bullets),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PerformanceStrategyTile extends StatelessWidget {
+  const _PerformanceStrategyTile({required this.strategy});
+
+  final PerformanceStrategy strategy;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.speed_outlined, color: Color(0xFF0B6E4F)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  strategy.label,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  strategy.description,
+                  style: const TextStyle(color: Colors.black54),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class OverviewView extends StatelessWidget {
   const OverviewView({super.key, required this.snapshot});
 
@@ -841,77 +1205,87 @@ class OverviewView extends StatelessWidget {
   Widget build(BuildContext context) {
     final spacing = ResponsiveBreakpoints.sectionSpacing(context);
 
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _ResponsiveSplit(
-            leftFlex: 2,
-            left: _Panel(
-              title: 'System architecture',
-              subtitle:
-                  'Mapped directly from the RF platform requirement into deployable product layers.',
-              child: Column(
-                children: [
-                  for (final layer in snapshot.serviceLayers)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 14),
-                      child: _ArchitectureLayer(layer: layer),
-                    ),
-                ],
-              ),
-            ),
-            right: _Panel(
-              title: 'Multi-tenant footprint',
-              subtitle: 'Regional tenancy and health segmentation.',
-              child: Column(
-                children: [
-                  for (final tenant in snapshot.tenants)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _TenantTile(tenant: tenant),
-                    ),
-                ],
-              ),
+    return Column(
+      children: [
+        _Panel(
+          title: 'RF Engine rollout order',
+          subtitle:
+              'Applied from the RF ENGINE.pdf sequence so implementation follows the intended dependency chain.',
+          child: _ResponsiveMetricGrid(
+            children: [
+              for (final item in snapshot.rfPromptSequence)
+                _PromptSequenceCard(item: item),
+            ],
+          ),
+        ),
+        SizedBox(height: spacing),
+        _ResponsiveSplit(
+          leftFlex: 2,
+          left: _Panel(
+            title: 'System architecture',
+            subtitle:
+                'Mapped directly from the RF platform requirement into deployable product layers.',
+            child: Column(
+              children: [
+                for (final layer in snapshot.serviceLayers)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: _ArchitectureLayer(layer: layer),
+                  ),
+              ],
             ),
           ),
-          SizedBox(height: spacing),
-          _ResponsiveSplit(
-            left: _Panel(
-              title: 'Execution timeline',
-              subtitle:
-                  'Live events from simulation, optimizer, and integration services.',
-              child: Column(
-                children: [
-                  for (final item in snapshot.timeline)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _TimelineTile(event: item),
-                    ),
-                ],
-              ),
-            ),
-            right: const _Panel(
-              title: 'Requirement coverage',
-              subtitle:
-                  'Each major platform module represented in the app shell.',
-              child: Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  _RequirementChip(label: 'RF simulation'),
-                  _RequirementChip(label: 'AI auto-planner'),
-                  _RequirementChip(label: 'Computer vision import'),
-                  _RequirementChip(label: 'Optimizer engine'),
-                  _RequirementChip(label: 'Insights dashboard'),
-                  _RequirementChip(label: 'Vendor integrations'),
-                  _RequirementChip(label: 'Real-time analyzer'),
-                  _RequirementChip(label: 'PDF reporting'),
-                ],
-              ),
+          right: _Panel(
+            title: 'Multi-tenant footprint',
+            subtitle: 'Regional tenancy and health segmentation.',
+            child: Column(
+              children: [
+                for (final tenant in snapshot.tenants)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _TenantTile(tenant: tenant),
+                  ),
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+        SizedBox(height: spacing),
+        _ResponsiveSplit(
+          left: _Panel(
+            title: 'Execution timeline',
+            subtitle:
+                'Live events from simulation, optimizer, and integration services.',
+            child: Column(
+              children: [
+                for (final item in snapshot.timeline)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _TimelineTile(event: item),
+                  ),
+              ],
+            ),
+          ),
+          right: const _Panel(
+            title: 'Requirement coverage',
+            subtitle:
+                'Each major platform module represented in the app shell.',
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _RequirementChip(label: 'RF simulation'),
+                _RequirementChip(label: 'AI auto-planner'),
+                _RequirementChip(label: 'Computer vision import'),
+                _RequirementChip(label: 'Optimizer engine'),
+                _RequirementChip(label: 'Insights dashboard'),
+                _RequirementChip(label: 'Vendor integrations'),
+                _RequirementChip(label: 'Real-time analyzer'),
+                _RequirementChip(label: 'PDF reporting'),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -925,81 +1299,130 @@ class RfPlannerView extends StatelessWidget {
   Widget build(BuildContext context) {
     final spacing = ResponsiveBreakpoints.sectionSpacing(context);
 
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _ResponsiveSplit(
-            leftFlex: 2,
-            left: _Panel(
-              title: 'Floor heatmap',
-              subtitle:
-                  'Illustrates high-fidelity propagation with AP placement overlays.',
-              child: SizedBox(
-                height: ResponsiveBreakpoints.isMobile(context) ? 300 : 380,
-                child: CustomPaint(
-                  painter: HeatmapPainter(accessPoints: snapshot.accessPoints),
-                  child: const SizedBox.expand(),
+    return Column(
+      children: [
+        _Panel(
+          title: 'RF engine modules',
+          subtitle:
+              'Production RF scope pulled directly from the RF engine document and mapped into implementation modules.',
+          child: Column(
+            children: [
+              for (final module in snapshot.rfEngineModules)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _RfEngineModuleCard(module: module),
                 ),
+            ],
+          ),
+        ),
+        SizedBox(height: spacing),
+        _ResponsiveSplit(
+          leftFlex: 2,
+          left: _Panel(
+            title: 'Floor heatmap',
+            subtitle:
+                'Illustrates high-fidelity propagation with AP placement overlays.',
+            child: SizedBox(
+              height: ResponsiveBreakpoints.isMobile(context) ? 300 : 380,
+              child: CustomPaint(
+                painter: HeatmapPainter(accessPoints: snapshot.accessPoints),
+                child: const SizedBox.expand(),
               ),
             ),
-            right: Column(
-              children: [
-                const _Panel(
-                  title: 'Signal model',
-                  subtitle:
-                      'Core RF engine outputs required by the production planner.',
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _FormulaRow(
-                        label: 'RSSI',
-                        formula:
-                            'TxPower - FSPL - attenuation - noise - environmental loss',
-                      ),
-                      SizedBox(height: 12),
-                      _FormulaRow(
-                        label: 'FSPL',
-                        formula: '20log10(d) + 20log10(f) + 32.44',
-                      ),
-                      SizedBox(height: 12),
-                      _FormulaRow(
-                        label: 'Outputs',
-                        formula: 'RSSI, SNR, throughput, interference risk',
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: spacing),
-                _Panel(
-                  title: 'Material attenuation',
-                  subtitle: 'Profiles ready for planner calibration.',
-                  child: Column(
-                    children: [
-                      for (final material in snapshot.materials)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _MaterialTile(material: material),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
           ),
-          SizedBox(height: spacing),
-          _Panel(
-            title: 'Access point plan',
+          right: Column(
+            children: [
+              const _Panel(
+                title: 'Signal model',
+                subtitle:
+                    'Core RF engine outputs required by the production planner.',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _FormulaRow(
+                      label: 'RSSI',
+                      formula:
+                          'TxPower - FSPL - attenuation - noise - environmental loss',
+                    ),
+                    SizedBox(height: 12),
+                    _FormulaRow(
+                      label: 'FSPL',
+                      formula: '20log10(d) + 20log10(f) + 32.44',
+                    ),
+                    SizedBox(height: 12),
+                    _FormulaRow(
+                      label: 'Outputs',
+                      formula: 'RSSI, SNR, throughput, interference risk',
+                    ),
+                    SizedBox(height: 12),
+                    _FormulaRow(
+                      label: 'Best AP',
+                      formula:
+                          'Evaluate all APs, choose best serving AP, then calculate CCI/ACI separately',
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: spacing),
+              _Panel(
+                title: 'Material attenuation',
+                subtitle: 'Profiles ready for planner calibration.',
+                child: Column(
+                  children: [
+                    for (final material in snapshot.materials)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _MaterialTile(material: material),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: spacing),
+        _Panel(
+          title: 'Access point plan',
+          subtitle:
+              'Current AP layout with band, channel, and TX power for optimization.',
+          child: _ResponsiveMetricGrid(
+            children: [
+              for (final ap in snapshot.accessPoints)
+                _AccessPointCard(accessPoint: ap),
+            ],
+          ),
+        ),
+        SizedBox(height: spacing),
+        _ResponsiveSplit(
+          left: _Panel(
+            title: 'Performance tuning',
             subtitle:
-                'Current AP layout with band, channel, and TX power for optimization.',
-            child: _ResponsiveMetricGrid(
+                'Browser-safe strategies from the RF tuning prompts for real-time simulation.',
+            child: Column(
               children: [
-                for (final ap in snapshot.accessPoints)
-                  _AccessPointCard(accessPoint: ap),
+                for (final strategy in snapshot.performanceStrategies)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _PerformanceStrategyTile(strategy: strategy),
+                  ),
               ],
             ),
           ),
-        ],
-      ),
+          right: const _Panel(
+            title: 'Advanced realism',
+            subtitle:
+                'Calibration targets required before shipping an engineering-grade planner.',
+            child: _BulletedBlock(
+              items: [
+                'Tune path loss exponent by environment instead of relying on one global value.',
+                'Validate wall attenuation against office, warehouse, and open-hall reference scenarios.',
+                'Model floor penetration and shadow fading before trusting multi-floor results.',
+                'Keep a fast interactive mode and a higher-fidelity validation mode.',
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1013,54 +1436,52 @@ class OptimizerView extends StatelessWidget {
   Widget build(BuildContext context) {
     final spacing = ResponsiveBreakpoints.sectionSpacing(context);
 
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _Panel(
-            title: 'Actionable recommendations',
+    return Column(
+      children: [
+        _Panel(
+          title: 'Actionable recommendations',
+          subtitle:
+              'Decision engine output matching the optimizer requirement.',
+          child: Column(
+            children: [
+              for (final action in snapshot.optimizerActions)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: _OptimizerTile(action: action),
+                ),
+            ],
+          ),
+        ),
+        SizedBox(height: spacing),
+        const _ResponsiveSplit(
+          left: _Panel(
+            title: 'Auto-planner strategy',
             subtitle:
-                'Decision engine output matching the optimizer requirement.',
-            child: Column(
-              children: [
-                for (final action in snapshot.optimizerActions)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: _OptimizerTile(action: action),
-                  ),
+                'Hybrid solver approach for AP placement, power, and channel planning.',
+            child: _BulletedBlock(
+              items: [
+                'Constraint pre-pass for walls, floor attenuation, and mandatory no-mount zones.',
+                'Heuristic seeding for initial AP positions based on target RSSI and capacity density.',
+                'Simulated annealing or genetic search for placement and transmit power refinement.',
+                'Policy engine validates vendor capabilities before change publication.',
               ],
             ),
           ),
-          SizedBox(height: spacing),
-          const _ResponsiveSplit(
-            left: _Panel(
-              title: 'Auto-planner strategy',
-              subtitle:
-                  'Hybrid solver approach for AP placement, power, and channel planning.',
-              child: _BulletedBlock(
-                items: [
-                  'Constraint pre-pass for walls, floor attenuation, and mandatory no-mount zones.',
-                  'Heuristic seeding for initial AP positions based on target RSSI and capacity density.',
-                  'Simulated annealing or genetic search for placement and transmit power refinement.',
-                  'Policy engine validates vendor capabilities before change publication.',
-                ],
-              ),
-            ),
-            right: _Panel(
-              title: 'Simulation before apply',
-              subtitle:
-                  'Every recommendation is tested on a shadow scenario before push.',
-              child: _BulletedBlock(
-                items: [
-                  'Replay current site topology against proposed changes.',
-                  'Calculate overlap, channel contention, and expected roaming score.',
-                  'Block unsafe actions when coverage drops below SLA target.',
-                  'Emit approvals package for human review and vendor sync.',
-                ],
-              ),
+          right: _Panel(
+            title: 'Simulation before apply',
+            subtitle:
+                'Every recommendation is tested on a shadow scenario before push.',
+            child: _BulletedBlock(
+              items: [
+                'Replay current site topology against proposed changes.',
+                'Calculate overlap, channel contention, and expected roaming score.',
+                'Block unsafe actions when coverage drops below SLA target.',
+                'Emit approvals package for human review and vendor sync.',
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -1075,54 +1496,52 @@ class InsightsView extends StatelessWidget {
     final chartHeight = ResponsiveBreakpoints.isMobile(context) ? 260.0 : 340.0;
     final spacing = ResponsiveBreakpoints.sectionSpacing(context);
 
-    return SingleChildScrollView(
-      child: _ResponsiveSplit(
-        leftFlex: 2,
-        left: _Panel(
-          title: 'Global analytics',
-          subtitle:
-              'Multi-site aggregation, health scoring, and historical posture.',
-          child: SizedBox(
-            height: chartHeight,
-            child: CustomPaint(
-              painter: TrendPainter(),
-              child: const SizedBox.expand(),
-            ),
+    return _ResponsiveSplit(
+      leftFlex: 2,
+      left: _Panel(
+        title: 'Global analytics',
+        subtitle:
+            'Multi-site aggregation, health scoring, and historical posture.',
+        child: SizedBox(
+          height: chartHeight,
+          child: CustomPaint(
+            painter: TrendPainter(),
+            child: const SizedBox.expand(),
           ),
         ),
-        right: Column(
-          children: [
-            const _Panel(
-              title: 'Core KPIs',
-              subtitle: 'Designed for the insights dashboard requirement.',
-              child: Column(
-                children: [
-                  _MetricRow(label: 'Mean retry rate', value: '2.7%'),
-                  SizedBox(height: 12),
-                  _MetricRow(label: 'Median roaming score', value: '88/100'),
-                  SizedBox(height: 12),
-                  _MetricRow(label: 'Capacity headroom', value: '21%'),
-                  SizedBox(height: 12),
-                  _MetricRow(label: 'Sites under watch', value: '9'),
-                ],
-              ),
+      ),
+      right: Column(
+        children: [
+          const _Panel(
+            title: 'Core KPIs',
+            subtitle: 'Designed for the insights dashboard requirement.',
+            child: Column(
+              children: [
+                _MetricRow(label: 'Mean retry rate', value: '2.7%'),
+                SizedBox(height: 12),
+                _MetricRow(label: 'Median roaming score', value: '88/100'),
+                SizedBox(height: 12),
+                _MetricRow(label: 'Capacity headroom', value: '21%'),
+                SizedBox(height: 12),
+                _MetricRow(label: 'Sites under watch', value: '9'),
+              ],
             ),
-            SizedBox(height: spacing),
-            const _Panel(
-              title: 'Inventory posture',
-              subtitle: 'Fleet snapshot across tenants and vendors.',
-              child: Column(
-                children: [
-                  _MetricRow(label: 'Managed APs', value: '1,662'),
-                  SizedBox(height: 12),
-                  _MetricRow(label: 'BLE beacons', value: '302'),
-                  SizedBox(height: 12),
-                  _MetricRow(label: 'Private 5G nodes', value: '18'),
-                ],
-              ),
+          ),
+          SizedBox(height: spacing),
+          const _Panel(
+            title: 'Inventory posture',
+            subtitle: 'Fleet snapshot across tenants and vendors.',
+            child: Column(
+              children: [
+                _MetricRow(label: 'Managed APs', value: '1,662'),
+                SizedBox(height: 12),
+                _MetricRow(label: 'BLE beacons', value: '302'),
+                SizedBox(height: 12),
+                _MetricRow(label: 'Private 5G nodes', value: '18'),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1137,52 +1556,50 @@ class IntegrationsView extends StatelessWidget {
   Widget build(BuildContext context) {
     final spacing = ResponsiveBreakpoints.sectionSpacing(context);
 
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _Panel(
-            title: 'Vendor connectivity',
-            subtitle:
-                'Unified configuration sync and drift detection across controller APIs.',
-            child: Column(
-              children: [
-                for (final integration in snapshot.integrations)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _IntegrationTile(integration: integration),
-                  ),
+    return Column(
+      children: [
+        _Panel(
+          title: 'Vendor connectivity',
+          subtitle:
+              'Unified configuration sync and drift detection across controller APIs.',
+          child: Column(
+            children: [
+              for (final integration in snapshot.integrations)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _IntegrationTile(integration: integration),
+                ),
+            ],
+          ),
+        ),
+        SizedBox(height: spacing),
+        const _ResponsiveSplit(
+          left: _Panel(
+            title: 'Authentication flow',
+            subtitle: 'How vendor API access should be established.',
+            child: _BulletedBlock(
+              items: [
+                'Tenant-scoped credential vault with rotated secrets.',
+                'OAuth where supported, API keys for legacy providers.',
+                'Read-only discovery path separate from write-capable apply path.',
+                'Audit events for every pulled or pushed configuration change.',
               ],
             ),
           ),
-          SizedBox(height: spacing),
-          const _ResponsiveSplit(
-            left: _Panel(
-              title: 'Authentication flow',
-              subtitle: 'How vendor API access should be established.',
-              child: _BulletedBlock(
-                items: [
-                  'Tenant-scoped credential vault with rotated secrets.',
-                  'OAuth where supported, API keys for legacy providers.',
-                  'Read-only discovery path separate from write-capable apply path.',
-                  'Audit events for every pulled or pushed configuration change.',
-                ],
-              ),
-            ),
-            right: _Panel(
-              title: 'Data mapping',
-              subtitle:
-                  'Normalize cross-vendor controller objects into one planner model.',
-              child: _BulletedBlock(
-                items: [
-                  'Site, floor, AP radio, SSID, channel, and power profiles normalized at ingest.',
-                  'Drift engine compares desired-state planner values against live configuration.',
-                  'Change packages generated per vendor connector before deployment.',
-                ],
-              ),
+          right: _Panel(
+            title: 'Data mapping',
+            subtitle:
+                'Normalize cross-vendor controller objects into one planner model.',
+            child: _BulletedBlock(
+              items: [
+                'Site, floor, AP radio, SSID, channel, and power profiles normalized at ingest.',
+                'Drift engine compares desired-state planner values against live configuration.',
+                'Change packages generated per vendor connector before deployment.',
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -1196,57 +1613,55 @@ class OperationsView extends StatelessWidget {
   Widget build(BuildContext context) {
     final spacing = ResponsiveBreakpoints.sectionSpacing(context);
 
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _ResponsiveSplit(
-            left: const _Panel(
-              title: 'Real-time analyzer',
-              subtitle:
-                  'Live diagnostics feed for RSSI, SNR, and channel quality.',
-              child: Column(
-                children: [
-                  _MetricRow(label: 'Streaming radios', value: '412'),
-                  SizedBox(height: 12),
-                  _MetricRow(label: 'Median RSSI', value: '-58 dBm'),
-                  SizedBox(height: 12),
-                  _MetricRow(label: 'Median SNR', value: '31 dB'),
-                  SizedBox(height: 12),
-                  _MetricRow(label: 'Open alerts', value: '14'),
-                ],
-              ),
-            ),
-            right: _Panel(
-              title: 'Report generator',
-              subtitle:
-                  'PDF output queue for coverage maps, assumptions, and recommendations.',
-              child: Column(
-                children: [
-                  for (final report in snapshot.reports)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _ReportTile(report: report),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          SizedBox(height: spacing),
-          const _Panel(
-            title: 'Computer vision import pipeline',
+    return Column(
+      children: [
+        _ResponsiveSplit(
+          left: const _Panel(
+            title: 'Real-time analyzer',
             subtitle:
-                'CAD, PDF, and image ingestion flow for auto wall detection.',
-            child: _BulletedBlock(
-              items: [
-                'Parse CAD layers or rasterized floor plans into normalized document objects.',
-                'Run detector for walls, doors, and windows; classify material hints when present.',
-                'Convert detections to vector geometry for planner editing and RF simulation.',
-                'Store immutable source files alongside editable geometry revisions.',
+                'Live diagnostics feed for RSSI, SNR, and channel quality.',
+            child: Column(
+              children: [
+                _MetricRow(label: 'Streaming radios', value: '412'),
+                SizedBox(height: 12),
+                _MetricRow(label: 'Median RSSI', value: '-58 dBm'),
+                SizedBox(height: 12),
+                _MetricRow(label: 'Median SNR', value: '31 dB'),
+                SizedBox(height: 12),
+                _MetricRow(label: 'Open alerts', value: '14'),
               ],
             ),
           ),
-        ],
-      ),
+          right: _Panel(
+            title: 'Report generator',
+            subtitle:
+                'PDF output queue for coverage maps, assumptions, and recommendations.',
+            child: Column(
+              children: [
+                for (final report in snapshot.reports)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _ReportTile(report: report),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        SizedBox(height: spacing),
+        const _Panel(
+          title: 'Computer vision import pipeline',
+          subtitle:
+              'CAD, PDF, and image ingestion flow for auto wall detection.',
+          child: _BulletedBlock(
+            items: [
+              'Parse CAD layers or rasterized floor plans into normalized document objects.',
+              'Run detector for walls, doors, and windows; classify material hints when present.',
+              'Convert detections to vector geometry for planner editing and RF simulation.',
+              'Store immutable source files alongside editable geometry revisions.',
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1585,27 +2000,42 @@ class _MaterialTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 14,
-          height: 14,
-          decoration: BoxDecoration(
-            color: material.color,
-            borderRadius: BorderRadius.circular(99),
+        Row(
+          children: [
+            Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                color: material.color,
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                material.name,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            Text(
+              '${material.lossDb.toStringAsFixed(1)} dB',
+              style: const TextStyle(color: Colors.black54),
+            ),
+          ],
+        ),
+        if (material.notes.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.only(left: 26),
+            child: Text(
+              material.notes,
+              style: const TextStyle(color: Colors.black54),
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            material.name,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-        ),
-        Text(
-          '${material.lossDb.toStringAsFixed(1)} dB',
-          style: const TextStyle(color: Colors.black54),
-        ),
+        ],
       ],
     );
   }

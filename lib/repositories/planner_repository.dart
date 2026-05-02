@@ -9,6 +9,118 @@ class PlannerRepository {
       activeSites: 184,
       connectedVendors: 4,
       liveClients: 18264,
+      rfEngineModules: [
+        RfEngineModule(
+          title: 'RF Core Model',
+          summary:
+              'Production-grade RSSI engine using a hybrid indoor path-loss model instead of pure FSPL.',
+          bullets: [
+            'RSSI = TxPower - PathLoss - WallLoss - TemperatureLoss - Noise',
+            'Base path loss starts with FSPL = 20log10(d) + 20log10(f) + 32.44',
+            'Indoor extension uses log-distance exponent n = 2-4 by environment',
+            'Optional log-normal shadow fading for enterprise realism',
+          ],
+        ),
+        RfEngineModule(
+          title: 'Advanced Propagation',
+          summary:
+              'Ekahau-level realism with multi-path, floor penetration, antenna gain, and environment profiles.',
+          bullets: [
+            'Approximate reflections and signal variability',
+            'Multi-floor propagation with vertical attenuation',
+            'Office, warehouse, and open-space environment tuning',
+            'Directional and omnidirectional antenna pattern support',
+          ],
+        ),
+        RfEngineModule(
+          title: 'Interference Engine',
+          summary:
+              'CCI and ACI modeling with frequency planning outputs and SINR heatmaps.',
+          bullets: [
+            'Evaluate signal from all APs, not only best-server coverage',
+            'Co-channel overlap impact per channel group',
+            'Adjacent channel spacing effects for ACI',
+            'Output interference level and SINR surfaces',
+          ],
+        ),
+        RfEngineModule(
+          title: 'Capacity and Heatmaps',
+          summary:
+              'Throughput and utilization estimation tuned for grid simulation and visual rendering.',
+          bullets: [
+            'Airtime utilization and throughput per AP',
+            'SNR-based data-rate and MCS approximation',
+            'RSSI, SNR, throughput, and congestion heatmaps',
+            'Overloaded AP detection and before/after comparison',
+          ],
+        ),
+      ],
+      rfPromptSequence: [
+        RfPromptSequence(
+          step: 1,
+          title: 'RF core',
+          goal:
+              'Implement the core signal model, strongest AP selection, and band-specific propagation.',
+        ),
+        RfPromptSequence(
+          step: 2,
+          title: 'Propagation',
+          goal:
+              'Extend to multi-path, shadowing, floor penetration, and antenna patterns.',
+        ),
+        RfPromptSequence(
+          step: 3,
+          title: 'Interference',
+          goal:
+              'Model co-channel and adjacent-channel interference with SINR outputs.',
+        ),
+        RfPromptSequence(
+          step: 4,
+          title: 'Capacity',
+          goal:
+              'Estimate airtime, AP congestion, and throughput under user load.',
+        ),
+        RfPromptSequence(
+          step: 5,
+          title: 'Heatmap',
+          goal:
+              'Render smooth RSSI, SNR, and throughput surfaces for large floorplans.',
+        ),
+        RfPromptSequence(
+          step: 6,
+          title: 'AI planner',
+          goal:
+              'Optimize AP placement, channel allocation, and transmit power.',
+        ),
+        RfPromptSequence(
+          step: 7,
+          title: 'Optimizer',
+          goal:
+              'Generate explainable recommendations and simulate before/after impact.',
+        ),
+      ],
+      performanceStrategies: [
+        PerformanceStrategy(
+          label: 'Spatial indexing',
+          description:
+              'Use quadtrees to prune AP and wall checks for each simulation cell.',
+        ),
+        PerformanceStrategy(
+          label: 'Distance pruning',
+          description:
+              'Skip distant APs once their theoretical RSSI falls below the simulation threshold.',
+        ),
+        PerformanceStrategy(
+          label: 'Intersection caching',
+          description:
+              'Cache repeated wall-intersection and attenuation paths across neighboring grid cells.',
+        ),
+        PerformanceStrategy(
+          label: 'Hybrid accuracy mode',
+          description:
+              'Trade some fidelity for interactive latency during live browser updates.',
+        ),
+      ],
       tenants: [
         TenantSummary(
           name: 'NorthStar Retail',
@@ -34,18 +146,27 @@ class PlannerRepository {
           name: 'Glass wall',
           lossDb: 3.2,
           color: Color(0xFF90CAF9),
+          notes: 'Low attenuation, but still important for 6 GHz edge cases.',
         ),
         MaterialProfile(
           name: 'Concrete',
           lossDb: 14.7,
           color: Color(0xFFB0BEC5),
+          notes:
+              'Heavy structural loss for office cores and floor penetration.',
         ),
         MaterialProfile(
           name: 'Metal rack',
           lossDb: 18.4,
           color: Color(0xFFA1887F),
+          notes: 'Warehouse shelving with strong shadowing and reflections.',
         ),
-        MaterialProfile(name: 'Drywall', lossDb: 4.6, color: Color(0xFFC5E1A5)),
+        MaterialProfile(
+          name: 'Drywall',
+          lossDb: 4.6,
+          color: Color(0xFFC5E1A5),
+          notes: 'Typical office partition baseline.',
+        ),
       ],
       accessPoints: [
         AccessPoint(

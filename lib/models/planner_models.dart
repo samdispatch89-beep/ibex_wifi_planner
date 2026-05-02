@@ -6,6 +6,9 @@ class PlannerSnapshot {
     required this.activeSites,
     required this.connectedVendors,
     required this.liveClients,
+    required this.rfEngineModules,
+    required this.rfPromptSequence,
+    required this.performanceStrategies,
     required this.tenants,
     required this.materials,
     required this.accessPoints,
@@ -20,6 +23,9 @@ class PlannerSnapshot {
   final int activeSites;
   final int connectedVendors;
   final int liveClients;
+  final List<RfEngineModule> rfEngineModules;
+  final List<RfPromptSequence> rfPromptSequence;
+  final List<PerformanceStrategy> performanceStrategies;
   final List<TenantSummary> tenants;
   final List<MaterialProfile> materials;
   final List<AccessPoint> accessPoints;
@@ -49,11 +55,13 @@ class MaterialProfile {
     required this.name,
     required this.lossDb,
     required this.color,
+    this.notes = '',
   });
 
   final String name;
   final double lossDb;
   final Color color;
+  final String notes;
 }
 
 class AccessPoint {
@@ -143,4 +151,35 @@ class DashboardPageDefinition {
   final String label;
   final IconData icon;
   final IconData selectedIcon;
+}
+
+class RfEngineModule {
+  const RfEngineModule({
+    required this.title,
+    required this.summary,
+    required this.bullets,
+  });
+
+  final String title;
+  final String summary;
+  final List<String> bullets;
+}
+
+class RfPromptSequence {
+  const RfPromptSequence({
+    required this.step,
+    required this.title,
+    required this.goal,
+  });
+
+  final int step;
+  final String title;
+  final String goal;
+}
+
+class PerformanceStrategy {
+  const PerformanceStrategy({required this.label, required this.description});
+
+  final String label;
+  final String description;
 }

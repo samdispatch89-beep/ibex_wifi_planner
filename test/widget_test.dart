@@ -25,7 +25,8 @@ void main() {
     addTearDown(tester.view.reset);
     await pumpAtSize(tester, const Size(1600, 1200));
 
-    expect(find.text('Ibex Planner'), findsOneWidget);
+    expect(find.text('Ibex Planner'), findsWidgets);
+    expect(find.text('Workspace shortcuts'), findsOneWidget);
     expect(find.text('System architecture'), findsOneWidget);
     expect(find.text('Global health'), findsOneWidget);
     expect(find.text('RF simulation'), findsOneWidget);
@@ -38,6 +39,7 @@ void main() {
     await pumpAtSize(tester, const Size(900, 1200));
 
     expect(find.text('Ibex Planner'), findsOneWidget);
+    expect(find.text('Workspace shortcuts'), findsOneWidget);
     expect(find.text('Overview'), findsWidgets);
     expect(find.text('System architecture'), findsOneWidget);
   });
@@ -49,7 +51,7 @@ void main() {
     await pumpAtSize(tester, const Size(390, 844));
 
     expect(find.text('Ibex Planner'), findsOneWidget);
-    expect(find.text('Global health'), findsOneWidget);
+    expect(find.text('Workspace shortcuts'), findsOneWidget);
     expect(find.text('System architecture'), findsOneWidget);
   });
 
