@@ -1,4 +1,5 @@
 import 'access_point.dart';
+import 'world_point.dart';
 
 enum EnvironmentPreset { openSpace, office, denseOffice, warehouse }
 
@@ -120,6 +121,8 @@ class PointMetrics {
       isOverloaded: false,
     );
   }
+
+  WorldPoint get worldPoint => WorldPoint(xMeters: xMeters, yMeters: yMeters);
 }
 
 class HeatmapCell {
@@ -211,11 +214,13 @@ class SimulationResult {
     required this.cells,
     required this.summary,
     required this.recommendations,
+    this.validationResults = const [],
   });
 
   final List<HeatmapCell> cells;
   final SimulationSummary summary;
   final List<OptimizerRecommendation> recommendations;
+  final List<ValidationScenarioResult> validationResults;
 
   static const empty = SimulationResult(
     cells: [],
@@ -227,5 +232,18 @@ class SimulationResult {
       overloadedAccessPoints: [],
     ),
     recommendations: [],
+    validationResults: [],
   );
+}
+
+class ValidationScenarioResult {
+  const ValidationScenarioResult({
+    required this.title,
+    required this.passed,
+    required this.details,
+  });
+
+  final String title;
+  final bool passed;
+  final String details;
 }

@@ -16,12 +16,15 @@ class InterferenceEngine {
         return;
       }
 
-      final weight = _channelOverlapWeight(bestAccessPoint, accessPoint);
-      if (weight <= 0) {
+      final reductionDb = _adjacentChannelReductionDb(
+        bestAccessPoint,
+        accessPoint,
+      );
+      if (reductionDb == null) {
         return;
       }
-
-      interferenceMilliwatts += _dbmToMilliwatts(signalDbm) * weight;
+      final weightedDbm = signalDbm + reductionDb;
+      interferenceMilliwatts += _dbmToMilliwatts(weightedDbm);
     });
 
     if (interferenceMilliwatts <= 0) {
@@ -47,31 +50,34 @@ class InterferenceEngine {
     return 10 * math.log(signalMw / denominator) / math.ln10;
   }
 
-  double _channelOverlapWeight(RfAccessPoint serving, RfAccessPoint other) {
+  double? _adjacentChannelReductionDb(
+    RfAccessPoint serving,
+    RfAccessPoint other,
+  ) {
     if (serving.band != other.band) {
-      return 0;
+      return null;
     }
 
     final difference = (serving.channel - other.channel).abs();
     if (difference == 0) {
-      return 1.0;
+      return 0.0;
     }
 
     switch (serving.band) {
       case FrequencyBand.band24:
         if (difference >= 5) {
-          return 0;
+          return null;
         }
         return switch (difference) {
-          1 => 0.65,
-          2 => 0.45,
-          3 => 0.3,
-          4 => 0.15,
-          _ => 0,
+          1 => -20.0,
+          2 => -24.0,
+          3 => -27.0,
+          4 => -30.0,
+          _ => null,
         };
       case FrequencyBand.band5:
       case FrequencyBand.band6:
-        return difference <= 4 ? 0.18 : 0;
+        return difference <= 4 ? -28.0 : null;
     }
   }
 

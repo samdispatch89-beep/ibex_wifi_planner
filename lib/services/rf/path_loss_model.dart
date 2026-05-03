@@ -1,20 +1,19 @@
 import 'dart:math' as math;
 
-import '../../models/access_point.dart';
 import '../../models/rf_result.dart';
 
 class EnvironmentProfile {
   const EnvironmentProfile({
-    required this.pathLossExponent,
+    required this.ituDistanceFactor,
     required this.shadowStdDev,
-    required this.environmentalLossDb,
     required this.rangeMeters,
+    required this.label,
   });
 
-  final double pathLossExponent;
+  final double ituDistanceFactor;
   final double shadowStdDev;
-  final double environmentalLossDb;
   final double rangeMeters;
+  final String label;
 }
 
 class PathLossModel {
@@ -24,62 +23,55 @@ class PathLossModel {
     switch (preset) {
       case EnvironmentPreset.openSpace:
         return const EnvironmentProfile(
-          pathLossExponent: 2.0,
+          ituDistanceFactor: 24,
           shadowStdDev: 1.2,
-          environmentalLossDb: 0.8,
-          rangeMeters: 32,
+          rangeMeters: 34,
+          label: 'Open space',
         );
       case EnvironmentPreset.office:
         return const EnvironmentProfile(
-          pathLossExponent: 2.4,
+          ituDistanceFactor: 29,
           shadowStdDev: 2.1,
-          environmentalLossDb: 1.5,
           rangeMeters: 26,
+          label: 'Office',
         );
       case EnvironmentPreset.denseOffice:
         return const EnvironmentProfile(
-          pathLossExponent: 3.1,
+          ituDistanceFactor: 35,
           shadowStdDev: 3.0,
-          environmentalLossDb: 2.4,
           rangeMeters: 20,
+          label: 'Dense office',
         );
       case EnvironmentPreset.warehouse:
         return const EnvironmentProfile(
-          pathLossExponent: 2.8,
+          ituDistanceFactor: 24,
           shadowStdDev: 2.6,
-          environmentalLossDb: 1.8,
           rangeMeters: 30,
+          label: 'Warehouse',
         );
     }
   }
 
   double calculatePathLoss({
+    required double frequencyMhz,
     required double distanceMeters,
-    required FrequencyBand band,
     required EnvironmentPreset environmentPreset,
+    required double floorLossDb,
+    required double wallLossDb,
+    double environmentalLossDb = 0,
     double shadowFadingDb = 0,
   }) {
     final safeDistance = distanceMeters <= 0.5 ? 0.5 : distanceMeters;
     final profile = profileFor(environmentPreset);
-    final fsplAtReference = _freeSpacePathLoss(1, band.frequencyMhz);
     final distanceComponent =
-        10 * profile.pathLossExponent * math.log(safeDistance) / math.ln10;
-    final bandPenalty = switch (band) {
-      FrequencyBand.band24 => 0.0,
-      FrequencyBand.band5 => 3.0,
-      FrequencyBand.band6 => 4.8,
-    };
+        profile.ituDistanceFactor * math.log(safeDistance) / math.ln10;
 
-    return fsplAtReference +
+    return (20 * math.log(frequencyMhz) / math.ln10) +
         distanceComponent +
-        profile.environmentalLossDb +
-        bandPenalty +
+        floorLossDb +
+        wallLossDb +
+        environmentalLossDb -
+        28 +
         shadowFadingDb;
-  }
-
-  double _freeSpacePathLoss(double distanceMeters, double frequencyMhz) {
-    return 20 * math.log(distanceMeters) / math.ln10 +
-        20 * math.log(frequencyMhz) / math.ln10 -
-        27.55;
   }
 }

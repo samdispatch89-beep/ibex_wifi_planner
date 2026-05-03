@@ -5,6 +5,7 @@ import '../../models/floor_plan.dart';
 import '../../models/material_obstacle.dart';
 import '../../models/rf_result.dart';
 import '../../models/user_density.dart';
+import '../../models/wall_segment.dart';
 import 'rf_engine.dart';
 
 class OptimizerEngine {
@@ -15,6 +16,7 @@ class OptimizerEngine {
   Future<List<OptimizerRecommendation>> generateRecommendations({
     required FloorPlan floorPlan,
     required List<RfAccessPoint> accessPoints,
+    required List<WallSegment> walls,
     required List<MaterialObstacle> obstacles,
     required List<UserDensityZone> densityZones,
     required SimulationSettings settings,
@@ -65,6 +67,7 @@ class OptimizerEngine {
                     : candidate,
               )
               .toList(growable: false),
+          walls: walls,
           obstacles: obstacles,
           densityZones: densityZones,
           settings: settings,
@@ -94,6 +97,7 @@ class OptimizerEngine {
                     : candidate,
               )
               .toList(growable: false),
+          walls: walls,
           obstacles: obstacles,
           densityZones: densityZones,
           settings: settings,
@@ -140,6 +144,7 @@ class OptimizerEngine {
       final delta = await _simulateRecommendation(
         floorPlan: floorPlan,
         accessPoints: [...accessPoints, proposed],
+        walls: walls,
         obstacles: obstacles,
         densityZones: densityZones,
         settings: settings,
@@ -214,6 +219,7 @@ class OptimizerEngine {
   Future<String> _simulateRecommendation({
     required FloorPlan floorPlan,
     required List<RfAccessPoint> accessPoints,
+    required List<WallSegment> walls,
     required List<MaterialObstacle> obstacles,
     required List<UserDensityZone> densityZones,
     required SimulationSettings settings,
@@ -222,6 +228,7 @@ class OptimizerEngine {
     final simulated = await _rfEngine.simulate(
       floorPlan: floorPlan,
       accessPoints: accessPoints,
+      walls: walls,
       obstacles: obstacles,
       densityZones: densityZones,
       settings: settings,

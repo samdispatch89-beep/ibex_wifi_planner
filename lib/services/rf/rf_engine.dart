@@ -6,6 +6,9 @@ import '../../models/floor_plan.dart';
 import '../../models/material_obstacle.dart';
 import '../../models/rf_result.dart';
 import '../../models/user_density.dart';
+import '../../models/wall_segment.dart';
+import '../../models/world_point.dart';
+import '../wall_geometry_service.dart';
 import 'capacity_engine.dart';
 import 'interference_engine.dart';
 import 'path_loss_model.dart';
@@ -17,17 +20,22 @@ class RfEngine {
     PathLossModel? pathLossModel,
     InterferenceEngine? interferenceEngine,
     CapacityEngine? capacityEngine,
+    WallGeometryService? wallGeometryService,
   }) : _pathLossModel = pathLossModel ?? const PathLossModel(),
        _interferenceEngine = interferenceEngine ?? const InterferenceEngine(),
-       _capacityEngine = capacityEngine ?? const CapacityEngine();
+       _capacityEngine = capacityEngine ?? const CapacityEngine(),
+       _wallGeometryService =
+           wallGeometryService ?? const WallGeometryService();
 
   final PathLossModel _pathLossModel;
   final InterferenceEngine _interferenceEngine;
   final CapacityEngine _capacityEngine;
+  final WallGeometryService _wallGeometryService;
 
   Future<SimulationResult> simulate({
     required FloorPlan floorPlan,
     required List<RfAccessPoint> accessPoints,
+    required List<WallSegment> walls,
     required List<MaterialObstacle> obstacles,
     required List<UserDensityZone> densityZones,
     required SimulationSettings settings,
@@ -58,6 +66,7 @@ class RfEngine {
           yMeters: y,
           floorPlan: floorPlan,
           accessPoints: filteredAps,
+          walls: walls,
           obstacles: obstacles,
           densityZones: densityZones,
           settings: settings,
@@ -110,6 +119,7 @@ class RfEngine {
     required double yMeters,
     required FloorPlan floorPlan,
     required List<RfAccessPoint> accessPoints,
+    required List<WallSegment> walls,
     required List<MaterialObstacle> obstacles,
     required List<UserDensityZone> densityZones,
     required SimulationSettings settings,
@@ -130,6 +140,7 @@ class RfEngine {
         continue;
       }
 
+      final targetPoint = WorldPoint(xMeters: xMeters, yMeters: yMeters);
       final shadow = settings.enableShadowFading
           ? _shadowFading(
               accessPointId: accessPoint.id,
@@ -138,31 +149,38 @@ class RfEngine {
               stdDev: settings.shadowFadingStdDev,
             )
           : 0.0;
+      final wallLoss = _wallLoss(
+        accessPoint: accessPoint,
+        targetPoint: targetPoint,
+        walls: walls,
+        cache: attenuationCache,
+      );
       final obstacleLoss = _obstacleLoss(
         accessPoint: accessPoint,
         xMeters: xMeters,
         yMeters: yMeters,
         obstacles: obstacles,
-        cache: attenuationCache,
       );
       final floorLoss =
           (accessPoint.floor - floorPlan.currentFloor).abs() *
           floorPlan.floorAttenuationDb;
       final pathLoss = _pathLossModel.calculatePathLoss(
+        frequencyMhz: accessPoint.frequencyMhz,
         distanceMeters: distance,
-        band: accessPoint.band,
         environmentPreset: settings.environmentPreset,
+        floorLossDb: floorLoss,
+        wallLossDb: wallLoss + obstacleLoss,
+        environmentalLossDb: floorPlan.temperatureLossDb,
         shadowFadingDb: shadow,
       );
       final directionalGain = _directionalGainDb(accessPoint, dx, dy);
-      final receivedDbm =
-          accessPoint.txPowerDbm +
-          accessPoint.antennaGainDbi +
-          directionalGain -
-          pathLoss -
-          obstacleLoss -
-          floorLoss -
-          floorPlan.temperatureLossDb;
+      final receivedDbm = math.min(
+        accessPoint.txPowerDbm,
+        accessPoint.txPowerDbm +
+            accessPoint.antennaGainDbi +
+            directionalGain -
+            pathLoss,
+      );
 
       if (receivedDbm >= settings.minUsefulRssiDbm - 18) {
         signals[accessPoint] = receivedDbm;
@@ -245,19 +263,34 @@ class RfEngine {
         .toList(growable: false);
   }
 
+  double _wallLoss({
+    required RfAccessPoint accessPoint,
+    required WorldPoint targetPoint,
+    required List<WallSegment> walls,
+    Map<String, double>? cache,
+  }) {
+    final key =
+        '${accessPoint.id}:${targetPoint.xMeters.toStringAsFixed(2)}:${targetPoint.yMeters.toStringAsFixed(2)}';
+    if (cache != null && cache.containsKey(key)) {
+      return cache[key]!;
+    }
+
+    final totalLoss = _wallGeometryService.summedLossForPath(
+      walls: walls,
+      a: WorldPoint(xMeters: accessPoint.xMeters, yMeters: accessPoint.yMeters),
+      b: targetPoint,
+      floor: accessPoint.floor,
+    );
+    cache?[key] = totalLoss;
+    return totalLoss;
+  }
+
   double _obstacleLoss({
     required RfAccessPoint accessPoint,
     required double xMeters,
     required double yMeters,
     required List<MaterialObstacle> obstacles,
-    Map<String, double>? cache,
   }) {
-    final key =
-        '${accessPoint.id}:${xMeters.toStringAsFixed(2)}:${yMeters.toStringAsFixed(2)}';
-    if (cache != null && cache.containsKey(key)) {
-      return cache[key]!;
-    }
-
     var totalLoss = 0.0;
     for (final obstacle in obstacles) {
       if (obstacle.floor != accessPoint.floor) {
@@ -272,7 +305,6 @@ class RfEngine {
         totalLoss += obstacle.attenuationDb;
       }
     }
-    cache?[key] = totalLoss;
     return totalLoss;
   }
 

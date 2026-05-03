@@ -20,7 +20,7 @@ class PlannerController extends ChangeNotifier {
 
   int _selectedIndex = 0;
   bool _isDeploymentProfileExpanded = false;
-  bool _isSidebarCollapsed = false;
+  bool _isSidebarCollapsed = true;
 
   PlannerSnapshot get snapshot => _snapshot;
   List<DashboardPageDefinition> get pages => List.unmodifiable(_pages);

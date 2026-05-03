@@ -28,7 +28,6 @@ void main() {
     expect(find.text('Ibex Planner'), findsWidgets);
     expect(find.text('Workspace shortcuts'), findsOneWidget);
     expect(find.text('System architecture'), findsOneWidget);
-    expect(find.text('Global health'), findsOneWidget);
     expect(find.text('RF simulation'), findsOneWidget);
   });
 

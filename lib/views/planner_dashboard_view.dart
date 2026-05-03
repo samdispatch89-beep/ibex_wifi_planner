@@ -71,6 +71,12 @@ class PlannerDashboardView extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          _TopFeatureBar(
+                            pages: pages,
+                            selectedIndex: selectedIndex,
+                            onSelected: controller.selectPage,
+                          ),
+                          SizedBox(height: sectionSpacing + 2),
                           _HeroHeader(
                             snapshot: snapshot,
                             selectedPage: selectedPage,
@@ -80,12 +86,6 @@ class PlannerDashboardView extends StatelessWidget {
                             onMenuPressed: isDesktop
                                 ? controller.toggleSidebar
                                 : () => Scaffold.of(context).openDrawer(),
-                          ),
-                          SizedBox(height: sectionSpacing + 2),
-                          _TopFeatureBar(
-                            pages: pages,
-                            selectedIndex: selectedIndex,
-                            onSelected: controller.selectPage,
                           ),
                           SizedBox(height: sectionSpacing + 4),
                           AnimatedPageSwitcher(
@@ -195,32 +195,28 @@ class _CollapsibleSidebar extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Row(
-            children: [
-              Expanded(child: _BrandHeader(compact: isCollapsed)),
-              const SizedBox(width: 8),
-              Tooltip(
-                message: isCollapsed ? 'Expand sidebar' : 'Collapse sidebar',
-                child: PressScale(
+          if (isCollapsed)
+            Column(
+              children: [
+                const _BrandHeader(compact: true),
+                const SizedBox(height: 12),
+                _SidebarToggleButton(
+                  isCollapsed: isCollapsed,
                   onTap: onToggleSidebar,
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(
-                      isCollapsed
-                          ? Icons.keyboard_double_arrow_right
-                          : Icons.keyboard_double_arrow_left,
-                      color: Colors.white,
-                    ),
-                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            )
+          else
+            Row(
+              children: [
+                const Expanded(child: _BrandHeader()),
+                const SizedBox(width: 8),
+                _SidebarToggleButton(
+                  isCollapsed: isCollapsed,
+                  onTap: onToggleSidebar,
+                ),
+              ],
+            ),
           SizedBox(height: spacing + 4),
           if (!isCollapsed) ...[
             _StatusBanner(snapshot: snapshot),
@@ -252,6 +248,37 @@ class _CollapsibleSidebar extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _SidebarToggleButton extends StatelessWidget {
+  const _SidebarToggleButton({required this.isCollapsed, required this.onTap});
+
+  final bool isCollapsed;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: isCollapsed ? 'Expand sidebar' : 'Collapse sidebar',
+      child: PressScale(
+        onTap: onTap,
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(
+            isCollapsed
+                ? Icons.keyboard_double_arrow_right
+                : Icons.keyboard_double_arrow_left,
+            color: Colors.white,
+          ),
+        ),
       ),
     );
   }
@@ -788,7 +815,7 @@ class _HeroCtaButton extends StatelessWidget {
         color: filled ? const Color(0xFF2563EB) : Colors.white,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-        color: filled ? const Color(0xFF2563EB) : const Color(0xFFD8D1C7),
+          color: filled ? const Color(0xFF2563EB) : const Color(0xFFD8D1C7),
         ),
       ),
       child: Wrap(

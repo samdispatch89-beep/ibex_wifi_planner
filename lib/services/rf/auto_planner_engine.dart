@@ -5,6 +5,7 @@ import '../../models/floor_plan.dart';
 import '../../models/material_obstacle.dart';
 import '../../models/rf_result.dart';
 import '../../models/user_density.dart';
+import '../../models/wall_segment.dart';
 import 'path_loss_model.dart';
 import 'rf_engine.dart';
 
@@ -19,6 +20,7 @@ class AutoPlannerEngine {
   Future<List<RfAccessPoint>> suggestAccessPoints({
     required FloorPlan floorPlan,
     required List<RfAccessPoint> currentAccessPoints,
+    required List<WallSegment> walls,
     required List<MaterialObstacle> obstacles,
     required List<UserDensityZone> densityZones,
     required SimulationSettings settings,
@@ -33,6 +35,7 @@ class AutoPlannerEngine {
       final simulation = await _rfEngine.simulate(
         floorPlan: floorPlan,
         accessPoints: working,
+        walls: walls,
         obstacles: obstacles,
         densityZones: densityZones,
         settings: settings,

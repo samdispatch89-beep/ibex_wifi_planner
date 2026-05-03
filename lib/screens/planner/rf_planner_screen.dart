@@ -3,13 +3,16 @@ import 'package:provider/provider.dart';
 
 import '../../controllers/rf_planner_controller.dart';
 import '../../models/access_point.dart';
+import '../../models/floor_plan.dart';
 import '../../models/material_obstacle.dart' as obstacle_model;
 import '../../models/rf_result.dart';
+import '../../models/world_point.dart';
+import '../../services/coordinate_transformer.dart';
 import '../../services/rf/heatmap_engine.dart';
 import '../../views/animated_ui.dart';
 import '../../views/responsive_breakpoints.dart';
+import '../../widgets/floorplan/floorplan_viewer.dart';
 import '../../widgets/heatmap/heatmap_legend.dart';
-import '../../widgets/heatmap/rf_heatmap_painter.dart';
 
 class RfPlannerScreen extends StatelessWidget {
   const RfPlannerScreen({super.key});
@@ -19,55 +22,60 @@ class RfPlannerScreen extends StatelessWidget {
     return Consumer<RfPlannerController>(
       builder: (context, controller, child) {
         final spacing = ResponsiveBreakpoints.sectionSpacing(context);
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final stacked = constraints.maxWidth < 1180;
-            final plannerHeight = stacked
-                ? (ResponsiveBreakpoints.isMobile(context) ? 360.0 : 460.0)
-                : (constraints.maxHeight > 0
-                      ? constraints.maxHeight.clamp(520.0, 760.0).toDouble()
-                      : 620.0);
-            final planner = SizedBox(
-              height: plannerHeight,
-              child: _PlannerCanvas(controller: controller),
-            );
-            final sidePanel = _SidePanel(controller: controller);
 
-            return Column(
-              children: [
-                _ControlPanel(controller: controller),
-                SizedBox(height: spacing),
-                if (stacked) ...[
-                  planner,
-                  SizedBox(height: spacing),
-                  sidePanel,
-                ] else
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _PlannerToolbar(controller: controller),
+            SizedBox(height: spacing),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final stacked = constraints.maxWidth < 1180;
+                final viewer = _FloorPlanWorkspace(controller: controller);
+                final sidePanel = _DebugSidePanel(controller: controller);
+
+                if (stacked) {
+                  return Column(
                     children: [
-                      Expanded(flex: 5, child: planner),
-                      SizedBox(width: spacing),
-                      SizedBox(width: 360, child: sidePanel),
+                      SizedBox(
+                        height: ResponsiveBreakpoints.isMobile(context)
+                            ? 420
+                            : 520,
+                        child: viewer,
+                      ),
+                      SizedBox(height: spacing),
+                      sidePanel,
                     ],
-                  ),
-              ],
-            );
-          },
+                  );
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 5,
+                      child: SizedBox(height: 720, child: viewer),
+                    ),
+                    SizedBox(width: spacing),
+                    SizedBox(width: 360, child: sidePanel),
+                  ],
+                );
+              },
+            ),
+          ],
         );
       },
     );
   }
 }
 
-class _ControlPanel extends StatelessWidget {
-  const _ControlPanel({required this.controller});
+class _PlannerToolbar extends StatelessWidget {
+  const _PlannerToolbar({required this.controller});
 
   final RfPlannerController controller;
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = ResponsiveBreakpoints.isMobile(context);
-
     return FadeSlideIn(
       child: Card(
         child: Padding(
@@ -78,7 +86,67 @@ class _ControlPanel extends StatelessWidget {
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
-                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  FilledButton.tonalIcon(
+                    onPressed: controller.isUploadingFloorPlan
+                        ? null
+                        : controller.uploadFloorPlan,
+                    icon: const Icon(Icons.upload_file_rounded),
+                    label: Text(
+                      controller.isUploadingFloorPlan
+                          ? 'Loading...'
+                          : 'Upload floor plan',
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: controller.fitFloorPlanToViewport,
+                    icon: const Icon(Icons.fit_screen_rounded),
+                    label: const Text('Fit to viewport'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: controller.undoLastWall,
+                    icon: const Icon(Icons.undo_rounded),
+                    label: const Text('Undo wall'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: controller.removeLastAccessPoint,
+                    icon: const Icon(Icons.router_outlined),
+                    label: const Text('Undo AP'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: controller.isSimulating
+                        ? null
+                        : controller.runSimulation,
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    label: const Text('Run Simulation'),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: controller.isSimulating
+                        ? null
+                        : controller.autoPlan,
+                    icon: const Icon(Icons.auto_awesome_outlined),
+                    label: const Text('Auto Plan'),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: controller.isSimulating
+                        ? null
+                        : controller.optimize,
+                    icon: const Icon(Icons.tune_rounded),
+                    label: const Text('Optimize'),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: controller.isSimulating
+                        ? null
+                        : controller.runValidationSuite,
+                    icon: const Icon(Icons.fact_check_outlined),
+                    label: const Text('Run validation'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
                 children: [
                   _LabeledDropdown<FrequencyBand>(
                     label: 'Band',
@@ -98,22 +166,24 @@ class _ControlPanel extends StatelessWidget {
                     label: 'Heatmap',
                     value: controller.heatmapType,
                     items: HeatmapType.values,
-                    itemLabel: (item) => item.name,
+                    itemLabel: (item) => item.name.toUpperCase(),
                     onChanged: controller.updateHeatmapType,
                   ),
                   _LabeledDropdown<PlannerInteractionMode>(
-                    label: 'Tool',
+                    label: 'Mode',
                     value: controller.interactionMode,
                     items: PlannerInteractionMode.values,
                     itemLabel: (item) => switch (item) {
                       PlannerInteractionMode.inspect => 'Inspect',
                       PlannerInteractionMode.placeAp => 'Place AP',
-                      PlannerInteractionMode.placeObstacle => 'Place obstacle',
+                      PlannerInteractionMode.calibrate => 'Calibrate',
+                      PlannerInteractionMode.drawWall => 'Draw wall',
+                      PlannerInteractionMode.deleteWall => 'Delete wall',
                     },
                     onChanged: controller.updateInteractionMode,
                   ),
                   _LabeledDropdown<obstacle_model.MaterialType>(
-                    label: 'Material',
+                    label: 'Wall material',
                     value: controller.selectedMaterialType,
                     items: obstacle_model.MaterialType.values,
                     itemLabel: (item) => item.label,
@@ -121,7 +191,7 @@ class _ControlPanel extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
               Wrap(
                 spacing: 18,
                 runSpacing: 12,
@@ -146,16 +216,16 @@ class _ControlPanel extends StatelessWidget {
                   ),
                   _SliderField(
                     label: 'Grid density',
-                    valueLabel: '${controller.settings.gridColumns} cols',
+                    valueLabel: '${controller.settings.gridColumns} columns',
                     value: controller.settings.gridColumns.toDouble(),
                     min: 18,
-                    max: 60,
+                    max: 72,
                     onChanged: (value) =>
                         controller.updateGridDensity(value.round()),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
@@ -170,70 +240,23 @@ class _ControlPanel extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 18),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  FilledButton.icon(
-                    onPressed: controller.isSimulating
-                        ? null
-                        : controller.runSimulation,
-                    icon: const Icon(Icons.play_arrow_rounded),
-                    label: const Text('Run Simulation'),
-                  ),
-                  FilledButton.tonalIcon(
-                    onPressed: controller.isSimulating
-                        ? null
-                        : controller.autoPlan,
-                    icon: const Icon(Icons.auto_awesome_outlined),
-                    label: const Text('Auto Plan'),
-                  ),
-                  FilledButton.tonalIcon(
-                    onPressed: controller.isSimulating
-                        ? null
-                        : controller.optimize,
-                    icon: const Icon(Icons.tune_rounded),
-                    label: const Text('Optimize'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: controller.removeLastAccessPoint,
-                    icon: const Icon(Icons.router_outlined),
-                    label: const Text('Undo AP'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: controller.removeLastObstacle,
-                    icon: const Icon(Icons.layers_clear_outlined),
-                    label: const Text('Undo Obstacle'),
-                  ),
-                ],
-              ),
+              _CalibrationPanel(controller: controller),
               const SizedBox(height: 14),
-              AnimatedOpacity(
-                opacity: controller.isSimulating ? 1 : 0.85,
-                duration: const Duration(milliseconds: 220),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      controller.statusMessage,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyMedium?.copyWith(color: Colors.black54),
-                    ),
-                    const SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(999),
-                      child: LinearProgressIndicator(
-                        minHeight: isMobile ? 8 : 10,
-                        value: controller.isSimulating
-                            ? controller.simulationProgress
-                            : (controller.simulationResult.cells.isEmpty
-                                  ? 0
-                                  : 1),
-                        backgroundColor: const Color(0xFFE5EFE5),
-                      ),
-                    ),
-                  ],
+              Text(
+                controller.statusMessage,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: Colors.black54),
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  minHeight: 9,
+                  value: controller.isSimulating
+                      ? controller.simulationProgress
+                      : (controller.simulationResult.cells.isEmpty ? 0 : 1),
+                  backgroundColor: const Color(0xFFE4ECE4),
                 ),
               ),
             ],
@@ -244,14 +267,76 @@ class _ControlPanel extends StatelessWidget {
   }
 }
 
-class _PlannerCanvas extends StatelessWidget {
-  const _PlannerCanvas({required this.controller});
+class _CalibrationPanel extends StatelessWidget {
+  const _CalibrationPanel({required this.controller});
 
   final RfPlannerController controller;
 
   @override
   Widget build(BuildContext context) {
-    final heatmapEngine = const HeatmapEngine();
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FBF6),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFDCE5D8)),
+      ),
+      child: Wrap(
+        spacing: 14,
+        runSpacing: 12,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(
+            'Calibration',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          SizedBox(
+            width: 180,
+            child: TextFormField(
+              initialValue: controller.calibrationDistanceMeters,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: InputDecoration(
+                labelText: 'Distance (meters)',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                isDense: true,
+              ),
+              onChanged: controller.updateCalibrationDistance,
+            ),
+          ),
+          FilledButton.tonal(
+            onPressed: controller.canApplyCalibration
+                ? controller.applyCalibration
+                : null,
+            child: const Text('Apply calibration'),
+          ),
+          OutlinedButton(
+            onPressed: controller.clearCalibrationSelection,
+            child: const Text('Clear points'),
+          ),
+          Text(
+            'Point A: ${controller.calibrationPointA == null ? 'unset' : 'set'}  •  Point B: ${controller.calibrationPointB == null ? 'unset' : 'set'}',
+            style: const TextStyle(color: Colors.black54),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FloorPlanWorkspace extends StatelessWidget {
+  const _FloorPlanWorkspace({required this.controller});
+
+  final RfPlannerController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = this.controller;
 
     return FadeSlideIn(
       child: Card(
@@ -261,66 +346,45 @@ class _PlannerCanvas extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'RF simulation canvas',
+                'Calibrated floor plan viewer',
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 6),
               Text(
-                'Tap to inspect, place APs, or add material obstacles. Heatmaps render on the current simulation grid.',
+                'Screen coordinates remain pixels. APs, walls, and RF sampling stay in world meters only.',
                 style: Theme.of(
                   context,
                 ).textTheme.bodyMedium?.copyWith(color: Colors.black54),
               ),
               const SizedBox(height: 16),
               Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return GestureDetector(
-                      onTapUp: (details) {
-                        final box = context.findRenderObject() as RenderBox?;
-                        if (box == null ||
-                            box.size.width <= 0 ||
-                            box.size.height <= 0) {
-                          return;
-                        }
-                        final local = details.localPosition;
-                        controller.handleCanvasTap(
-                          normalizedX: (local.dx / box.size.width).clamp(
-                            0.0,
-                            1.0,
-                          ),
-                          normalizedY: (local.dy / box.size.height).clamp(
-                            0.0,
-                            1.0,
-                          ),
-                        );
-                      },
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(24),
-                        child: CustomPaint(
-                          painter: RfHeatmapPainter(
-                            floorPlan: controller.floorPlan,
-                            cells: controller.simulationResult.cells,
-                            accessPoints: controller.accessPoints,
-                            obstacles: controller.obstacles,
-                            densityZones: controller.densityZones,
-                            heatmapType: controller.heatmapType,
-                            selectedPoint: controller.selectedPointMetrics,
-                            heatmapEngine: heatmapEngine,
-                          ),
-                          child: const SizedBox.expand(),
-                        ),
-                      ),
-                    );
+                child: FloorPlanViewer(
+                  floorPlan: controller.floorPlan,
+                  transformationController: controller.transformationController,
+                  cells: controller.simulationResult.cells,
+                  heatmapType: controller.heatmapType,
+                  selectedPoint: controller.selectedPointMetrics,
+                  walls: controller.walls,
+                  pendingWallStart: controller.pendingWallStart,
+                  pointerPreviewWorld: controller.hoverWorldPoint,
+                  calibrationPointA: controller.calibrationPointA,
+                  calibrationPointB: controller.calibrationPointB,
+                  onViewerSized: controller.updateViewerSize,
+                  onTap: (offset) {
+                    controller.handleViewerTap(screenPosition: offset);
                   },
+                  onHover: controller.updateHoverScreenPosition,
+                  accessPointLayer: _AccessPointSceneOverlay(
+                    controller: controller,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
               HeatmapLegend(
                 type: controller.heatmapType,
-                heatmapEngine: heatmapEngine,
+                heatmapEngine: const _LegendAdapter(),
               ),
             ],
           ),
@@ -330,51 +394,110 @@ class _PlannerCanvas extends StatelessWidget {
   }
 }
 
-class _SidePanel extends StatelessWidget {
-  const _SidePanel({required this.controller});
+class _AccessPointSceneOverlay extends StatelessWidget {
+  const _AccessPointSceneOverlay({required this.controller});
 
   final RfPlannerController controller;
 
   @override
   Widget build(BuildContext context) {
-    final summary = controller.simulationResult.summary;
+    final transformer = const CoordinateTransformer();
+    return IgnorePointer(
+      child: CustomPaint(
+        painter: _AccessPointScenePainter(
+          floorPlan: controller.floorPlan,
+          accessPoints: controller.accessPoints,
+          transformer: transformer,
+        ),
+        child: const SizedBox.expand(),
+      ),
+    );
+  }
+}
+
+class _AccessPointScenePainter extends CustomPainter {
+  _AccessPointScenePainter({
+    required this.floorPlan,
+    required this.accessPoints,
+    required this.transformer,
+  });
+
+  final FloorPlan floorPlan;
+  final List<RfAccessPoint> accessPoints;
+  final CoordinateTransformer transformer;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final accessPoint in accessPoints) {
+      final center = transformer.worldToImagePixel(
+        WorldPoint(xMeters: accessPoint.xMeters, yMeters: accessPoint.yMeters),
+        floorPlan,
+      );
+      canvas.drawCircle(center, 10, Paint()..color = const Color(0xFF10352A));
+      canvas.drawCircle(
+        center,
+        28,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..color = const Color(0xFF10352A).withValues(alpha: 0.25),
+      );
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: accessPoint.channel.toString(),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 8,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      textPainter.paint(
+        canvas,
+        Offset(
+          center.dx - (textPainter.width / 2),
+          center.dy - (textPainter.height / 2),
+        ),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AccessPointScenePainter oldDelegate) {
+    return oldDelegate.accessPoints != accessPoints ||
+        oldDelegate.floorPlan != floorPlan;
+  }
+}
+
+class _DebugSidePanel extends StatelessWidget {
+  const _DebugSidePanel({required this.controller});
+
+  final RfPlannerController controller;
+
+  @override
+  Widget build(BuildContext context) {
     final selected = controller.selectedPointMetrics;
+    final summary = controller.simulationResult.summary;
 
     return Column(
       children: [
         _MetricPanel(
-          title: 'Simulation summary',
-          child: Column(
-            children: [
-              _MetricRow(
-                label: 'Coverage @ -65',
-                value: '${summary.coverageAtMinus65.toStringAsFixed(1)}%',
-              ),
-              _MetricRow(
-                label: 'Avg SNR',
-                value: '${summary.averageSnr.toStringAsFixed(1)} dB',
-              ),
-              _MetricRow(
-                label: 'Avg SINR',
-                value: '${summary.averageSinr.toStringAsFixed(1)} dB',
-              ),
-              _MetricRow(
-                label: 'Avg throughput',
-                value:
-                    '${summary.averageThroughputMbps.toStringAsFixed(0)} Mbps',
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        _MetricPanel(
           title: 'Selected point',
           child: selected == null
               ? const Text(
-                  'Tap the floor plan to inspect point-level RF metrics.',
+                  'Tap the viewer to inspect world coordinates and RF metrics.',
                 )
               : Column(
                   children: [
+                    _MetricRow(
+                      label: 'World X',
+                      value: '${selected.xMeters.toStringAsFixed(2)} m',
+                    ),
+                    _MetricRow(
+                      label: 'World Y',
+                      value: '${selected.yMeters.toStringAsFixed(2)} m',
+                    ),
                     _MetricRow(
                       label: 'Best AP',
                       value: selected.bestServingApId ?? 'None',
@@ -392,12 +515,43 @@ class _SidePanel extends StatelessWidget {
                       value: '${selected.sinrDb.toStringAsFixed(1)} dB',
                     ),
                     _MetricRow(
-                      label: 'Throughput',
+                      label: 'Interference',
                       value:
-                          '${selected.throughputMbps.toStringAsFixed(0)} Mbps',
+                          '${selected.interferenceDb.toStringAsFixed(1)} dBm',
                     ),
                   ],
                 ),
+        ),
+        const SizedBox(height: 12),
+        _MetricPanel(
+          title: 'Plan summary',
+          child: Column(
+            children: [
+              _MetricRow(
+                label: 'Floor size',
+                value:
+                    '${controller.floorPlan.widthMeters.toStringAsFixed(1)}m × ${controller.floorPlan.heightMeters.toStringAsFixed(1)}m',
+              ),
+              _MetricRow(
+                label: 'Meters/pixel',
+                value: controller.floorPlan.metersPerPixel.toStringAsFixed(5),
+              ),
+              _MetricRow(
+                label: 'Coverage @ -65',
+                value: '${summary.coverageAtMinus65.toStringAsFixed(1)}%',
+              ),
+              _MetricRow(
+                label: 'Average throughput',
+                value:
+                    '${summary.averageThroughputMbps.toStringAsFixed(0)} Mbps',
+              ),
+              _MetricRow(label: 'Walls', value: '${controller.walls.length}'),
+              _MetricRow(
+                label: 'Access points',
+                value: '${controller.accessPoints.length}',
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
         _MetricPanel(
@@ -411,56 +565,96 @@ class _SidePanel extends StatelessWidget {
                     for (final recommendation in controller.recommendations)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 10),
-                        child: HoverLift(
-                          borderRadius: 18,
-                          enableHover: !ResponsiveBreakpoints.isMobile(context),
-                          hoverOffset: -2,
-                          child: Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF6FBF5),
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: const Color(0xFFDCE6DC),
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF7FBF6),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: const Color(0xFFDCE7DC)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                recommendation.title,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                recommendation.description,
+                                style: const TextStyle(color: Colors.black54),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                recommendation.impactSummary,
+                                style: const TextStyle(
+                                  color: Color(0xFF0B6E4F),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              FilledButton.tonal(
+                                onPressed: controller.isSimulating
+                                    ? null
+                                    : () => controller.applyRecommendation(
+                                        recommendation,
+                                      ),
+                                child: const Text('Apply Recommendation'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+        const SizedBox(height: 12),
+        _MetricPanel(
+          title: 'Validation scenarios',
+          child: controller.validationResults.isEmpty
+              ? const Text(
+                  'Run the validation suite to verify propagation behavior.',
+                )
+              : Column(
+                  children: [
+                    for (final result in controller.validationResults)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              result.passed
+                                  ? Icons.check_circle_rounded
+                                  : Icons.error_outline_rounded,
+                              color: result.passed
+                                  ? const Color(0xFF2D9E67)
+                                  : const Color(0xFFD94841),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    result.title,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    result.details,
+                                    style: const TextStyle(
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  recommendation.title,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  recommendation.description,
-                                  style: const TextStyle(color: Colors.black54),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  recommendation.impactSummary,
-                                  style: const TextStyle(
-                                    color: Color(0xFF0B6E4F),
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: FilledButton.tonal(
-                                    onPressed: controller.isSimulating
-                                        ? null
-                                        : () => controller.applyRecommendation(
-                                            recommendation,
-                                          ),
-                                    child: const Text('Apply Recommendation'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                          ],
                         ),
                       ),
                   ],
@@ -516,7 +710,7 @@ class _MetricRow extends StatelessWidget {
           Expanded(
             child: Text(label, style: const TextStyle(color: Colors.black54)),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Flexible(
             child: Text(
               value,
@@ -560,8 +754,8 @@ class _SliderField extends StatelessWidget {
               Text(
                 valueLabel,
                 style: const TextStyle(
-                  fontWeight: FontWeight.w700,
                   color: Color(0xFF0B6E4F),
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -595,10 +789,8 @@ class _LabeledDropdown<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compact = ResponsiveBreakpoints.isMobile(context);
-
     return SizedBox(
-      width: compact ? 132 : 180,
+      width: ResponsiveBreakpoints.isMobile(context) ? 152 : 180,
       child: DropdownButtonFormField<T>(
         initialValue: value,
         isExpanded: true,
@@ -613,8 +805,8 @@ class _LabeledDropdown<T> extends StatelessWidget {
               value: item,
               child: Text(
                 itemLabel(item),
-                overflow: TextOverflow.ellipsis,
                 maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
         ],
@@ -626,4 +818,8 @@ class _LabeledDropdown<T> extends StatelessWidget {
       ),
     );
   }
+}
+
+class _LegendAdapter extends HeatmapEngine {
+  const _LegendAdapter();
 }
